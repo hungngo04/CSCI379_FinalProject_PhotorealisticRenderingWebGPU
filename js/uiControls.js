@@ -33,6 +33,17 @@ export function createUIControls() {
       <button id="btnRotZPos">Rotate +Z</button>
       <button id="btnRotZNeg">Rotate -Z</button>
       <hr/>
+      <!-- Light Controls -->
+      <h3>Light Controls</h3>
+      <label for="light-x">X:</label>
+      <input type="number" id="light-x" value="0.0"><br/>
+      <label for="light-y">Y:</label>
+      <input type="number" id="light-y" value="0.0"><br/>
+      <label for="light-z">Z:</label>
+      <input type="number" id="light-z" value="0.0"><br/>
+      <label for="light-intensity">Intensity:</label>
+      <input type="number" id="light-intensity" value="1.0">
+      <span id="light-intensity-value">1.0</span>
     `;
   document.body.appendChild(controlsDiv);
   return controlsDiv;
@@ -106,4 +117,29 @@ export function setupCameraControls(camera, tracerObj, moveStep = 0.05, rotateSt
 export function setupTraceTypeControls(tracerObj) {
   // Setting DRR as the default trace type
   tracerObj.setTraceType(1); // DRR
+}
+
+/**
+ * Sets up light controls - handles x, y, z, and intensity UI for the light and updates the GPU buffer
+ * @param {Object} volumeObj - The volume object to update
+ */
+export function setupLightControls(volumeObj) {
+  const lx = document.getElementById('light-x');
+  const ly = document.getElementById('light-y');
+  const lz = document.getElementById('light-z');
+  const lint = document.getElementById('light-intensity');
+  const lintVal = document.getElementById('light-intensity-value');
+  function updateLight() {
+    const lightParams = new Float32Array([
+      parseFloat(lx.value),
+      parseFloat(ly.value),
+      parseFloat(lz.value),
+      parseFloat(lint.value), // intensity in slot 3
+      1.0, 1.0, 1.0,         // color (white) in slots 4,5,6
+      0.0                    // pad
+    ]);
+    volumeObj._device.queue.writeBuffer(volumeObj._lightBuffer, 0, lightParams);
+    lintVal.textContent = lint.value;
+  }
+  [lx, ly, lz, lint].forEach(ctrl => ctrl.addEventListener('input', updateLight));
 }

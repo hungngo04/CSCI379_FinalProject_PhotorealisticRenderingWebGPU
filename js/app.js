@@ -6,7 +6,7 @@ import RayTracer from '/lib/Viz/RayTracer.js';
 import VolumeRenderingSimpleObject from '/lib/DSViz/VolumeRenderingSimpleObject.js';
 import Camera from '/lib/Viz/3DCamera.js';
 import { createCanvas } from './canvasSetup.js';
-import { createUIControls, setupCameraControls, setupTraceTypeControls } from './uiControls.js';
+import { createUIControls, setupCameraControls, setupLightControls, setupTraceTypeControls } from './uiControls.js';
 import { setupRenderLoop } from './renderLoop.js';
 
 /**
@@ -35,6 +35,7 @@ export async function initApp() {
   const moveStep = 0.05;
   const rotateStep = 0.1;
   setupCameraControls(camera, tracerObj, moveStep, rotateStep);
+  setupLightControls(tracerObj);
   
   // Set up trace type controls
   setupTraceTypeControls(tracerObj);

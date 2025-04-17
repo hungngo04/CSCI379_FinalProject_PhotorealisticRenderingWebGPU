@@ -268,6 +268,14 @@ struct Material {
   _pad2: vec2f,
 }
 
+// struct to store light info
+struct Light {
+  position: vec3f,
+  intensity: f32,
+  color: vec3f,
+  _pad: f32,
+}
+
 // binding the camera pose
 @group(0) @binding(0) var<uniform> cameraPose: Camera ;
 // binding the volume info
@@ -280,6 +288,8 @@ struct Material {
 @group(0) @binding(4) var<uniform> traceType: u32;
 
 @group(0) @binding(5) var<uniform> material: Material;
+
+@group(0) @binding(6) var<uniform> light: Light;
 
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f) -> vec3f {
@@ -446,7 +456,11 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
     let intensity = 1.0 - exp(-attenuationAccumulator);
     let clampedIntensity = clamp(intensity, 0.0, 1.0);
     
-    color = vec4f(clampedIntensity * material.albedo, 1.0);
+    let normal = vec3f(0.0, 0.0, 1.0); // TEMP: hardcoded normal (toward camera)
+    let lightDir = normalize(light.position - p);
+    let diff = max(dot(normal, lightDir), 0.0) * light.intensity;
+    let litColor = clampedIntensity * diff * material.albedo * light.color;
+    color = vec4f(litColor, 1.0);
   }
   else {
     color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
