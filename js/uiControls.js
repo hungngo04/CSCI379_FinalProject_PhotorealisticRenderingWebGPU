@@ -33,12 +33,6 @@ export function createUIControls() {
       <button id="btnRotZPos">Rotate +Z</button>
       <button id="btnRotZNeg">Rotate -Z</button>
       <hr/>
-      <!-- Trace Type Selection -->
-      <h3>Trace Type</h3>
-      <button id="btnMIP">MIP</button>
-      <button id="btnDRR">DRR</button><br/><br/>
-      <button id="btnDepth">Depth Encoding</button>
-      <button id="btnEdge">Spectral Edge</button>
     `;
   document.body.appendChild(controlsDiv);
   return controlsDiv;
@@ -106,20 +100,10 @@ export function setupCameraControls(camera, tracerObj, moveStep = 0.05, rotateSt
 }
 
 /**
- * Sets up trace type selection buttons
+ * Sets up trace type control - now only supports DRR
  * @param {Object} tracerObj - The tracer object to update
  */
 export function setupTraceTypeControls(tracerObj) {
-  document.getElementById("btnMIP").addEventListener("click", () => {
-    tracerObj.setTraceType(0); // MIP
-  });
-  document.getElementById("btnDRR").addEventListener("click", () => {
-    tracerObj.setTraceType(1); // DRR
-  });
-  document.getElementById("btnDepth").addEventListener("click", () => {
-    tracerObj.setTraceType(2); // Depth Encoding
-  });
-  document.getElementById("btnEdge").addEventListener("click", () => {
-    tracerObj.setTraceType(3); // Spectral Edge Detection
-  });
+  // Setting DRR as the default trace type
+  tracerObj.setTraceType(1); // DRR
 }
