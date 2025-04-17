@@ -259,6 +259,15 @@ struct VolInfo {
   sizes: vec4f, // voxel sizes
 }
 
+// struct to store material info
+struct Material {
+  albedo: vec3f,
+  roughness: f32,
+  metallic: f32,
+  _pad1: f32,
+  _pad2: vec2f,
+}
+
 // binding the camera pose
 @group(0) @binding(0) var<uniform> cameraPose: Camera ;
 // binding the volume info
@@ -269,6 +278,8 @@ struct VolInfo {
 @group(0) @binding(3) var outTexture: texture_storage_2d<rgba8unorm, write>;
 
 @group(0) @binding(4) var<uniform> traceType: u32;
+
+@group(0) @binding(5) var<uniform> material: Material;
 
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f) -> vec3f {
@@ -332,7 +343,7 @@ fn getVolumeHitValues(checkval: f32, halfsize: vec2f, pval: f32, dval: f32, p: v
 // a function to compute the start and end t values of the ray hitting the volume
 fn rayVolumeIntersection(p: vec3f, d: vec3f) -> vec2f {
   var hitValues = vec2f(-1, -1);
-  let halfsize = volInfo.dims * volInfo.sizes * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
+  let halfsize = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z); // 1mm
   //let halfsize = vec3f(0.5, 0.5, 0.5) * volInfo.sizes.xyz;
   // hitPt = p + t * d => t = (hitPt - p) / d
   hitValues = getVolumeHitValues(halfsize.z, halfsize.xy, p.z, d.z, p.xy, d.xy, hitValues); // z = halfsize.z
@@ -435,7 +446,7 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
     let intensity = 1.0 - exp(-attenuationAccumulator);
     let clampedIntensity = clamp(intensity, 0.0, 1.0);
     
-    color = vec4f(clampedIntensity, clampedIntensity, clampedIntensity, 1.0);
+    color = vec4f(clampedIntensity * material.albedo, 1.0);
   }
   else {
     color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
