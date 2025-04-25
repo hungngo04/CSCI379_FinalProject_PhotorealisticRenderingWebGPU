@@ -276,6 +276,13 @@ struct Light {
   _pad: f32,
 }
 
+struct TissueProperties {
+  color: vec3f,
+  opacity: f32,
+  specular: f32,
+  roughness: f32,
+}
+
 // binding the camera pose
 @group(0) @binding(0) var<uniform> cameraPose: Camera ;
 // binding the volume info
@@ -380,44 +387,234 @@ fn getNextHitValue(startT: f32, curT: f32, checkval: f32, minCorner: vec2f, maxC
   return cur;
 }
 
-// a function to trace the volume - volume rendering
-fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
-  // start and end points
-  var hits = rayVolumeIntersection(p, d);
-  var color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); 
+// classify tissue based on intensity and gradient magnitude
+fn classifyTissue(voxelValue: f32, gradientMagnitude: f32) -> u32 {
+  let normalizedValue = voxelValue / 4095.0;
+  let normalizedGradient = min(length(gradientMagnitude) / 300.0, 1.0);
   
-  // if there is only one hit point -> trace from the camera center
+  if (normalizedValue > 0.70) {
+    if (normalizedGradient > 0.5) {
+      return 1u; // bone boundary
+    }
+    return 2u; // bone interior
+  }
+  
+  // white matter
+  else if (normalizedValue > 0.40 && normalizedValue <= 0.70) {
+    if (normalizedGradient > 0.3) {
+      return 3u; // white matter boundary
+    }
+    return 4u; // white matter interior
+  }
+  
+  // gray matter
+  else if (normalizedValue > 0.20 && normalizedValue <= 0.40) {
+    if (normalizedGradient > 0.25) {
+      return 5u; // gray matter boundary
+    }
+    return 6u; // gray matter interior
+  }
+  
+  // csf and other low-density tissues
+  else if (normalizedValue > 0.05) {
+    return 7u; // csf or other soft tissues
+  }
+  
+  // background
+  return 0u;
+}
+
+// function to get tissue optical properties - MAIN
+// fn getTissueProperties(tissueType: u32) -> TissueProperties {
+//   var properties: TissueProperties;
+
+//   switch(tissueType) {
+//     case 1u: { // bone boundary
+//       properties.color = vec3f(0, 0.98, 0.92);
+//       properties.opacity = 0.95;
+//       properties.specular = 0.3;
+//       properties.roughness = 0.7;
+//       break;
+//     }
+//     case 2u: { // bone interior
+//       properties.color = vec3f(0.9, 0.85, 0.8);
+//       properties.opacity = 0.8;
+//       properties.specular = 0.1;
+//       properties.roughness = 0.9;
+//       break;
+//     }
+//     case 3u: { // white matter boundary
+//       properties.color = vec3f(0.95, 0.95, 1.0); // 0 1 0 for debugging
+//       properties.opacity = 0.7;
+//       properties.specular = 0.2;
+//       properties.roughness = 0.6;
+//       break;
+//     }
+//     case 4u: { // white matter interior
+//       properties.color = vec3f(0.85, 0.85, 0.95);
+//       properties.opacity = 0.5;
+//       properties.specular = 0.05;
+//       properties.roughness = 0.8;
+//       break;
+//     }
+//     case 5u: { // gray matter boundary
+//       properties.color = vec3f(0.8, 0.8, 0.85); // 1 0 0 for debugging
+//       properties.opacity = 0.6;
+//       properties.specular = 0.1;
+//       properties.roughness = 0.7;
+//       break;
+//     }
+//     case 6u: { // gray matter interior
+//       properties.color = vec3f(0.7, 0.7, 0.75);
+//       properties.opacity = 0.4;
+//       properties.specular = 0.05;
+//       properties.roughness = 0.9;
+//       break;
+//     }
+//     case 7u: { // csf and other tissues
+//       properties.color = vec3f(0.5, 0.6, 0.7);
+//       properties.opacity = 0.2;
+//       properties.specular = 0.0;
+//       properties.roughness = 1.0;
+//       break;
+//     }
+//     default: { // background
+//       properties.color = vec3f(0.0, 0.0, 0.0);
+//       properties.opacity = 0.0;
+//       properties.specular = 0.0;
+//       properties.roughness = 1.0;
+//     }
+//   }
+  
+//   return properties;
+// }
+
+// function to get tissue optical properties
+fn getTissueProperties(tissueType: u32) -> TissueProperties {
+  var properties: TissueProperties;
+
+  switch(tissueType) {
+    case 1u: { // bone boundary
+      properties.color = vec3f(1.0, 1.0, 0.0); // bright yellow
+      properties.opacity = 0.95;
+      properties.specular = 0.3;
+      properties.roughness = 0.7;
+      break;
+    }
+    case 2u: { // bone interior
+      properties.color = vec3f(1.0, 0.5, 0.0); // orange
+      properties.opacity = 0.8;
+      properties.specular = 0.1;
+      properties.roughness = 0.9;
+      break;
+    }
+    case 3u: { // white matter boundary
+      properties.color = vec3f(0.0, 1.0, 0.0); // bright green
+      properties.opacity = 0.7;
+      properties.specular = 0.2;
+      properties.roughness = 0.6;
+      break;
+    }
+    case 4u: { // white matter interior
+      properties.color = vec3f(0.0, 0.5, 0.0); // dark green
+      properties.opacity = 0.5;
+      properties.specular = 0.05;
+      properties.roughness = 0.8;
+      break;
+    }
+    case 5u: { // gray matter boundary
+      properties.color = vec3f(1.0, 0.0, 0.0); // bright red
+      properties.opacity = 0.6;
+      properties.specular = 0.1;
+      properties.roughness = 0.7;
+      break;
+    }
+    case 6u: { // gray matter interior
+      properties.color = vec3f(0.7, 0.0, 0.0); // dark red
+      properties.opacity = 0.4;
+      properties.specular = 0.05;
+      properties.roughness = 0.9;
+      break;
+    }
+    case 7u: { // csf and other tissues
+      properties.color = vec3f(0.0, 0.0, 1.0); // bright blue
+      properties.opacity = 0.2;
+      properties.specular = 0.0;
+      properties.roughness = 1.0;
+      break;
+    }
+    default: { // background
+      properties.color = vec3f(0.3, 0.3, 0.3); // visible gray
+      properties.opacity = 0.0;
+      properties.specular = 0.0;
+      properties.roughness = 1.0;
+    }
+  }
+  
+  return properties;
+}
+
+// calculate gradient at a point in the volume
+fn calculateGradient(voxelIdx: vec3i) -> vec3f {
+  // check if we're in the volume
+  if (voxelIdx.x <= 0 || voxelIdx.x >= i32(volInfo.dims.x) - 1 ||
+      voxelIdx.y <= 0 || voxelIdx.y >= i32(volInfo.dims.y) - 1 ||
+      voxelIdx.z <= 0 || voxelIdx.z >= i32(volInfo.dims.z) - 1) {
+    return vec3f(0.0, 0.0, 0.0);
+  }
+  
+  // sample in all 6 dirs
+  let idxX1 = (voxelIdx.x + 1) + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  let idxX0 = (voxelIdx.x - 1) + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  let idxY1 = voxelIdx.x + (voxelIdx.y + 1) * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  let idxY0 = voxelIdx.x + (voxelIdx.y - 1) * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  let idxZ1 = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + (voxelIdx.z + 1) * i32(volInfo.dims.x * volInfo.dims.y);
+  let idxZ0 = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + (voxelIdx.z - 1) * i32(volInfo.dims.x * volInfo.dims.y);
+  
+  // gradients in each direction using central differences
+  let gx = (volData[idxX1] - volData[idxX0]) / 2.0;
+  let gy = (volData[idxY1] - volData[idxY0]) / 2.0;
+  let gz = (volData[idxZ1] - volData[idxZ0]) / 2.0;
+  
+  return vec3f(gx, gy, gz);
+}
+
+fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
+  // Start and end points
+  var hits = rayVolumeIntersection(p, d);
+  var color = vec4f(0.0, 0.0, 0.0, 1.0);
+  
+  // If there is only one hit point -> trace from the camera center
   if (hits.y < 0 && hits.x > 0) {
     hits.y = hits.x;
     hits.x = 0;
   }
   
-  if (hits.x >= 0) { 
+  if (hits.x >= 0) {
     let epsilon = 0.00001;
-    
     var curHitValue = hits.x + epsilon;
-    
     let voxelSize = vec3f(1, 1, 1) * volInfo.sizes.xyz / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
     
-    var attenuationAccumulator = 0.0;
+    // For photorealistic rendering
+    var accumulatedColor = vec3f(0.0, 0.0, 0.0);
+    var remainingTransmission = 1.0;
     
-    while (curHitValue < hits.y) {
+    while (curHitValue < hits.y && remainingTransmission > 0.01) {
       let curPoint = p + d * curHitValue;
       
-      // convert world position to voxel index
-      // normalize to [-0.5, 0.5] range
+      // Convert world position to voxel index
       let halfsize = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
       let normalizedPos = curPoint / halfsize;
       
-      // scale to voxel indices and shift to [0, dims] range
+      // Scale to voxel indices and shift to [0, dims] range
       let voxelPos = (normalizedPos + vec3f(1.0, 1.0, 1.0)) * 0.5 * volInfo.dims.xyz;
       let voxelIdx = vec3i(voxelPos);
       
-      // compute voxel corners -> find the next hit value
+      // Compute voxel corners -> find the next hit value
       let minCorner = vec3f(floor(voxelPos.x), floor(voxelPos.y), floor(voxelPos.z)) / volInfo.dims.xyz * 2.0 - vec3f(1.0, 1.0, 1.0);
       let maxCorner = vec3f(ceil(voxelPos.x), ceil(voxelPos.y), ceil(voxelPos.z)) / volInfo.dims.xyz * 2.0 - vec3f(1.0, 1.0, 1.0);
       
-      // back to world coordinates
+      // Back to world coordinates
       let minCornerWorld = minCorner * halfsize;
       let maxCornerWorld = maxCorner * halfsize;
       
@@ -430,7 +627,17 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
       nextHitValue = getNextHitValue(hits.x, nextHitValue, minCornerWorld.z, minCornerWorld.xy, maxCornerWorld.xy, p.z, d.z, p.xy, d.xy);
       nextHitValue = getNextHitValue(hits.x, nextHitValue, maxCornerWorld.z, minCornerWorld.xy, maxCornerWorld.xy, p.z, d.z, p.xy, d.xy);
       
+      if (nextHitValue <= curHitValue || nextHitValue >= hits.y) {
+        nextHitValue = curHitValue + min(min(voxelSize.x, voxelSize.y), voxelSize.z) * 0.5;
+      }
+      
+      let deltaT = nextHitValue - curHitValue;
+      
       var voxelValue = 0.0;
+      var normal = vec3f(0.0, 0.0, 0.0);
+      var hasValidNormal = false;
+      var gradient = vec3f(0.0, 0.0, 0.0);
+      
       if (voxelIdx.x >= 0 && voxelIdx.x < i32(volInfo.dims.x) &&
           voxelIdx.y >= 0 && voxelIdx.y < i32(volInfo.dims.y) &&
           voxelIdx.z >= 0 && voxelIdx.z < i32(volInfo.dims.z)) {
@@ -439,28 +646,62 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
                    voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
         
         voxelValue = volData[index];
+        
+        // calculate gradient for all voxels (for classification)
+        gradient = calculateGradient(voxelIdx);
+        
+        if (length(gradient) > EPSILON) {
+          normal = -normalize(gradient);
+          hasValidNormal = true;
+        }
       }
       
-      if (nextHitValue <= curHitValue || nextHitValue >= hits.y) {
-        nextHitValue = curHitValue + min(min(voxelSize.x, voxelSize.y), voxelSize.z) * 0.5;
+      // skip low density regions
+      if (voxelValue > 50.0) {
+        // classify tissue based on intensity and gradient
+        let tissueType = classifyTissue(voxelValue, length(gradient));
+        let properties = getTissueProperties(tissueType);
+        
+        // scale opacity by the step size and user-defined factor
+        var opacity = properties.opacity * (1.0 - exp(-deltaT * 10.0));
+        
+        // only apply lighting if we have a valid normal
+        if (hasValidNormal) {
+          // calculate lighting
+          let viewDir = -d;  // direction to camera
+          let lightDir = normalize(light.position - curPoint);
+          
+          // diffuse lighting
+          let diff = max(dot(normal, lightDir), 0.0) * light.intensity;
+          
+          // ambient term
+          let ambient = 0.2;
+          
+          // specular
+          let reflectDir = reflect(-lightDir, normal);
+          let specPower = mix(128.0, 1.0, properties.roughness);
+          let specular = pow(max(dot(reflectDir, viewDir), 0.0), specPower) * properties.specular;
+          
+          // combine lighting terms
+          let lightingFactor = ambient + diff + specular;
+          
+          // apply lighting to color
+          let litColor = properties.color * lightingFactor * light.color;
+          
+          // accumulate color with front-to-back compositing
+          accumulatedColor += remainingTransmission * opacity * litColor;
+        } else {
+          accumulatedColor += remainingTransmission * opacity * properties.color;
+        }
+
+        // update remaining transmission
+        remainingTransmission *= (1.0 - opacity);
       }
-      
-      let deltaT = nextHitValue - curHitValue;
-      
-      attenuationAccumulator += deltaT * (voxelValue / 4095.0);
       
       curHitValue = nextHitValue + epsilon;
     }
     
-    // final intensity using Beer-Lambert law
-    let intensity = 1.0 - exp(-attenuationAccumulator);
-    let clampedIntensity = clamp(intensity, 0.0, 1.0);
-    
-    let normal = vec3f(0.0, 0.0, 1.0); // TEMP: hardcoded normal (toward camera)
-    let lightDir = normalize(light.position - p);
-    let diff = max(dot(normal, lightDir), 0.0) * light.intensity;
-    let litColor = clampedIntensity * diff * material.albedo * light.color;
-    color = vec4f(litColor, 1.0);
+    color = vec4f(accumulatedColor, 1.0);
   }
   else {
     color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
@@ -488,31 +729,4 @@ fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
     // Always use DRR regardless of trace type
     traceSceneDRR(uv, spt, rdir);
   }
-}
-
-@compute
-@workgroup_size(16, 16)
-fn computeProjectiveMain(@builtin(global_invocation_id) global_id: vec3u) {
-  // let uv = vec2i(global_id.xy);
-  // let texDim = vec2i(textureDimensions(outTexture));
-  // if (uv.x < texDim.x && uv.y < texDim.y) {
-  //   let sensorSize = vec2f(2.0, 2.0) / cameraPose.focal;
-
-  //   let psize = sensorSize / cameraPose.res;
-
-  //   let px = (f32(uv.x) + 0.5) * psize.x - sensorSize.x * 0.5;
-  //   let py = (f32(uv.y) + 0.5) * psize.y - sensorSize.y * 0.5;
-  //   let p = vec3f(px, py, 1.0);
-
-  //   var spt = vec3f(0.0, 0.0, 0.0);
-
-  //   var rdir = normalize(p - spt);
-
-  //   spt = transformPt(spt);
-  //   rdir = transformDir(rdir);
-
-  //   let hitInfo = rayVolumeIntersection(spt, rdir);
-
-  //   assignColor(uv, hitInfo.x, i32(hitInfo.y));
-  // }
 }
