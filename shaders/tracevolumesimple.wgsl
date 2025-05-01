@@ -1,26 +1,3 @@
-/* 
- * Copyright (c) 2025 SingChun LEE @ Bucknell University. CC BY-NC 4.0.
- * 
- * This code is provided mainly for educational purposes at Bucknell University.
- *
- * This code is licensed under the Creative Commons Attribution-NonCommerical 4.0
- * International License. To view a copy of the license, visit 
- *   https://creativecommons.org/licenses/by-nc/4.0/
- * or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
- *
- * You are free to:
- *  - Share: copy and redistribute the material in any medium or format.
- *  - Adapt: remix, transform, and build upon the material.
- *
- * Under the following terms:
- *  - Attribution: You must give appropriate credit, provide a link to the license,
- *                 and indicate if changes where made.
- *  - NonCommerical: You may not use the material for commerical purposes.
- *  - No additional restrictions: You may not apply legal terms or technological 
- *                                measures that legally restrict others from doing
- *                                anything the license permits.
- */
-
 // struct to sture 3D PGA multivector
 struct MultiVector {
   s: f32, 
@@ -424,127 +401,61 @@ fn classifyTissue(voxelValue: f32, gradientMagnitude: f32) -> u32 {
   return 0u;
 }
 
-// function to get tissue optical properties - MAIN
-// fn getTissueProperties(tissueType: u32) -> TissueProperties {
-//   var properties: TissueProperties;
-
-//   switch(tissueType) {
-//     case 1u: { // bone boundary
-//       properties.color = vec3f(0, 0.98, 0.92);
-//       properties.opacity = 0.95;
-//       properties.specular = 0.3;
-//       properties.roughness = 0.7;
-//       break;
-//     }
-//     case 2u: { // bone interior
-//       properties.color = vec3f(0.9, 0.85, 0.8);
-//       properties.opacity = 0.8;
-//       properties.specular = 0.1;
-//       properties.roughness = 0.9;
-//       break;
-//     }
-//     case 3u: { // white matter boundary
-//       properties.color = vec3f(0.95, 0.95, 1.0); // 0 1 0 for debugging
-//       properties.opacity = 0.7;
-//       properties.specular = 0.2;
-//       properties.roughness = 0.6;
-//       break;
-//     }
-//     case 4u: { // white matter interior
-//       properties.color = vec3f(0.85, 0.85, 0.95);
-//       properties.opacity = 0.5;
-//       properties.specular = 0.05;
-//       properties.roughness = 0.8;
-//       break;
-//     }
-//     case 5u: { // gray matter boundary
-//       properties.color = vec3f(0.8, 0.8, 0.85); // 1 0 0 for debugging
-//       properties.opacity = 0.6;
-//       properties.specular = 0.1;
-//       properties.roughness = 0.7;
-//       break;
-//     }
-//     case 6u: { // gray matter interior
-//       properties.color = vec3f(0.7, 0.7, 0.75);
-//       properties.opacity = 0.4;
-//       properties.specular = 0.05;
-//       properties.roughness = 0.9;
-//       break;
-//     }
-//     case 7u: { // csf and other tissues
-//       properties.color = vec3f(0.5, 0.6, 0.7);
-//       properties.opacity = 0.2;
-//       properties.specular = 0.0;
-//       properties.roughness = 1.0;
-//       break;
-//     }
-//     default: { // background
-//       properties.color = vec3f(0.0, 0.0, 0.0);
-//       properties.opacity = 0.0;
-//       properties.specular = 0.0;
-//       properties.roughness = 1.0;
-//     }
-//   }
-  
-//   return properties;
-// }
-
-// function to get tissue optical properties
 fn getTissueProperties(tissueType: u32) -> TissueProperties {
   var properties: TissueProperties;
 
   switch(tissueType) {
     case 1u: { // bone boundary
-      properties.color = vec3f(1.0, 1.0, 0.0); // bright yellow
+      properties.color = vec3f(0.96, 0.91, 0.86);
       properties.opacity = 0.95;
       properties.specular = 0.3;
       properties.roughness = 0.7;
       break;
     }
     case 2u: { // bone interior
-      properties.color = vec3f(1.0, 0.5, 0.0); // orange
-      properties.opacity = 0.8;
+      properties.color = vec3f(0.92, 0.86, 0.78);
+      properties.opacity = 0.9;
       properties.specular = 0.1;
       properties.roughness = 0.9;
       break;
     }
     case 3u: { // white matter boundary
-      properties.color = vec3f(0.0, 1.0, 0.0); // bright green
+      properties.color = vec3f(0.95, 0.62, 0.55);
       properties.opacity = 0.7;
       properties.specular = 0.2;
       properties.roughness = 0.6;
       break;
     }
     case 4u: { // white matter interior
-      properties.color = vec3f(0.0, 0.5, 0.0); // dark green
-      properties.opacity = 0.5;
+      properties.color = vec3f(0.92, 0.58, 0.52);
+      properties.opacity = 0.6;
       properties.specular = 0.05;
       properties.roughness = 0.8;
       break;
     }
     case 5u: { // gray matter boundary
-      properties.color = vec3f(1.0, 0.0, 0.0); // bright red
+      properties.color = vec3f(0.89, 0.55, 0.50);
       properties.opacity = 0.6;
       properties.specular = 0.1;
       properties.roughness = 0.7;
       break;
     }
     case 6u: { // gray matter interior
-      properties.color = vec3f(0.7, 0.0, 0.0); // dark red
+      properties.color = vec3f(0.85, 0.48, 0.45);
       properties.opacity = 0.4;
       properties.specular = 0.05;
       properties.roughness = 0.9;
       break;
     }
     case 7u: { // csf and other tissues
-      properties.color = vec3f(0.0, 0.0, 1.0); // bright blue
+      properties.color = vec3f(0.90, 0.65, 0.60);
       properties.opacity = 0.2;
       properties.specular = 0.0;
       properties.roughness = 1.0;
       break;
     }
     default: { // background
-      properties.color = vec3f(0.3, 0.3, 0.3); // visible gray
+      properties.color = vec3f(0.3, 0.3, 0.3);
       properties.opacity = 0.0;
       properties.specular = 0.0;
       properties.roughness = 1.0;
@@ -599,7 +510,13 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
     var accumulatedColor = vec3f(0.0, 0.0, 0.0);
     var remainingTransmission = 1.0;
     
-    while (curHitValue < hits.y && remainingTransmission > 0.01) {
+    // Add max samples to prevent infinite loops
+    let maxSamples = 500;
+    var sampleCount = 0;
+    
+    while (curHitValue < hits.y && remainingTransmission > 0.01 && sampleCount < maxSamples) {
+      sampleCount += 1;
+      
       let curPoint = p + d * curHitValue;
       
       // Convert world position to voxel index
@@ -656,14 +573,19 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
         }
       }
       
-      // skip low density regions
-      if (voxelValue > 50.0) {
-        // classify tissue based on intensity and gradient
+      if (voxelValue > 20.0) {
         let tissueType = classifyTissue(voxelValue, length(gradient));
         let properties = getTissueProperties(tissueType);
         
-        // scale opacity by the step size and user-defined factor
-        var opacity = properties.opacity * (1.0 - exp(-deltaT * 10.0));
+        let densityFactor = min(voxelValue / 4095.0 * 3.0, 1.0);
+        let stepSize = deltaT * 10.0 * (1.0 + densityFactor * 5.0);
+        
+        // exponential attenuation based on density and distance
+        var opacity = properties.opacity * (1.0 - exp(-stepSize));
+        
+        if (tissueType == 1u || tissueType == 2u) {  // bone tissue types
+          opacity = min(opacity * 1.5, 0.98);  // increase opacity but cap at 98%
+        }
         
         // only apply lighting if we have a valid normal
         if (hasValidNormal) {
@@ -696,6 +618,10 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
 
         // update remaining transmission
         remainingTransmission *= (1.0 - opacity);
+        
+        if (remainingTransmission < 0.01) {
+          break;
+        }
       }
       
       curHitValue = nextHitValue + epsilon;
@@ -704,12 +630,11 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
     color = vec4f(accumulatedColor, 1.0);
   }
   else {
-    color = vec4f(0.f/255, 56.f/255, 101.f/255, 1.); // Bucknell Blue
+    color = vec4f(0.f/255, 0.f/255, 0.f/255, 1.); // Black
   }
   
   textureStore(outTexture, uv, color);
 }
-
 @compute
 @workgroup_size(16, 16)
 fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
