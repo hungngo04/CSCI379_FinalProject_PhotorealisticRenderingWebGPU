@@ -465,37 +465,72 @@ fn getTissueProperties(tissueType: u32) -> TissueProperties {
   return properties;
 }
 
-// calculate gradient at a point in the volume
-fn calculateGradient(voxelIdx: vec3i) -> vec3f {
-  // check if we're in the volume
-  if (voxelIdx.x <= 0 || voxelIdx.x >= i32(volInfo.dims.x) - 1 ||
-      voxelIdx.y <= 0 || voxelIdx.y >= i32(volInfo.dims.y) - 1 ||
-      voxelIdx.z <= 0 || voxelIdx.z >= i32(volInfo.dims.z) - 1) {
-    return vec3f(0.0, 0.0, 0.0);
+// trilinear interpolation
+fn sampleVolumeTrilinear(pos: vec3f) -> f32 {
+  let halfsize = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let normalizedPos = pos / halfsize;
+  let voxelPos = (normalizedPos + vec3f(1.0, 1.0, 1.0)) * 0.5 * volInfo.dims.xyz;
+  
+  let voxelIdx = vec3i(floor(voxelPos));
+  let frac = voxelPos - vec3f(voxelIdx);
+  
+  if (voxelIdx.x < 0 || voxelIdx.x >= i32(volInfo.dims.x - 1) ||
+      voxelIdx.y < 0 || voxelIdx.y >= i32(volInfo.dims.y - 1) ||
+      voxelIdx.z < 0 || voxelIdx.z >= i32(volInfo.dims.z - 1)) {
+    return 0.0;
   }
   
-  // sample in all 6 dirs
-  let idxX1 = (voxelIdx.x + 1) + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
-  let idxX0 = (voxelIdx.x - 1) + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
-  let idxY1 = voxelIdx.x + (voxelIdx.y + 1) * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
-  let idxY0 = voxelIdx.x + (voxelIdx.y - 1) * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
-  let idxZ1 = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + (voxelIdx.z + 1) * i32(volInfo.dims.x * volInfo.dims.y);
-  let idxZ0 = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + (voxelIdx.z - 1) * i32(volInfo.dims.x * volInfo.dims.y);
+  // 8 corner values
+  let i000 = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  let i001 = i000 + i32(volInfo.dims.x * volInfo.dims.y);
+  let i010 = i000 + i32(volInfo.dims.x);
+  let i011 = i001 + i32(volInfo.dims.x);
+  let i100 = i000 + 1;
+  let i101 = i001 + 1;
+  let i110 = i010 + 1;
+  let i111 = i011 + 1;
   
-  // gradients in each direction using central differences
-  let gx = (volData[idxX1] - volData[idxX0]) / 2.0;
-  let gy = (volData[idxY1] - volData[idxY0]) / 2.0;
-  let gz = (volData[idxZ1] - volData[idxZ0]) / 2.0;
+  let v000 = volData[i000];
+  let v001 = volData[i001];
+  let v010 = volData[i010];
+  let v011 = volData[i011];
+  let v100 = volData[i100];
+  let v101 = volData[i101];
+  let v110 = volData[i110];
+  let v111 = volData[i111];
   
-  return vec3f(gx, gy, gz);
+  let v00 = mix(v000, v100, frac.x);
+  let v01 = mix(v001, v101, frac.x);
+  let v10 = mix(v010, v110, frac.x);
+  let v11 = mix(v011, v111, frac.x);
+  
+  let v0 = mix(v00, v10, frac.y);
+  let v1 = mix(v01, v11, frac.y);
+  
+  return mix(v0, v1, frac.z);
+}
+
+fn calculateGradientInterpolated(pos: vec3f) -> vec3f {
+  let h = vec3f(1.0) / volInfo.dims.xyz;
+  
+  let vx1 = sampleVolumeTrilinear(pos + vec3f(h.x, 0.0, 0.0));
+  let vx0 = sampleVolumeTrilinear(pos - vec3f(h.x, 0.0, 0.0));
+  let vy1 = sampleVolumeTrilinear(pos + vec3f(0.0, h.y, 0.0));
+  let vy0 = sampleVolumeTrilinear(pos - vec3f(0.0, h.y, 0.0));
+  let vz1 = sampleVolumeTrilinear(pos + vec3f(0.0, 0.0, h.z));
+  let vz0 = sampleVolumeTrilinear(pos - vec3f(0.0, 0.0, h.z));
+  
+  return vec3f(
+    (vx1 - vx0) / (2.0 * h.x),
+    (vy1 - vy0) / (2.0 * h.y),
+    (vz1 - vz0) / (2.0 * h.z)
+  );
 }
 
 fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
-  // Start and end points
   var hits = rayVolumeIntersection(p, d);
   var color = vec4f(0.0, 0.0, 0.0, 1.0);
   
-  // If there is only one hit point -> trace from the camera center
   if (hits.y < 0 && hits.x > 0) {
     hits.y = hits.x;
     hits.x = 0;
@@ -514,63 +549,26 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
     let maxSamples = 500;
     var sampleCount = 0;
     
+    let stepMultiplier = 0.5;
+    
     while (curHitValue < hits.y && remainingTransmission > 0.01 && sampleCount < maxSamples) {
       sampleCount += 1;
       
       let curPoint = p + d * curHitValue;
       
-      // Convert world position to voxel index
-      let halfsize = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
-      let normalizedPos = curPoint / halfsize;
+      let voxelValue = sampleVolumeTrilinear(curPoint);
       
-      // Scale to voxel indices and shift to [0, dims] range
-      let voxelPos = (normalizedPos + vec3f(1.0, 1.0, 1.0)) * 0.5 * volInfo.dims.xyz;
-      let voxelIdx = vec3i(voxelPos);
-      
-      // Compute voxel corners -> find the next hit value
-      let minCorner = vec3f(floor(voxelPos.x), floor(voxelPos.y), floor(voxelPos.z)) / volInfo.dims.xyz * 2.0 - vec3f(1.0, 1.0, 1.0);
-      let maxCorner = vec3f(ceil(voxelPos.x), ceil(voxelPos.y), ceil(voxelPos.z)) / volInfo.dims.xyz * 2.0 - vec3f(1.0, 1.0, 1.0);
-      
-      // Back to world coordinates
-      let minCornerWorld = minCorner * halfsize;
-      let maxCornerWorld = maxCorner * halfsize;
-      
-      var nextHitValue = hits.y;
-      
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, minCornerWorld.x, minCornerWorld.yz, maxCornerWorld.yz, p.x, d.x, p.yz, d.yz);
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, maxCornerWorld.x, minCornerWorld.yz, maxCornerWorld.yz, p.x, d.x, p.yz, d.yz);
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, minCornerWorld.y, minCornerWorld.xz, maxCornerWorld.xz, p.y, d.y, p.xz, d.xz);
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, maxCornerWorld.y, minCornerWorld.xz, maxCornerWorld.xz, p.y, d.y, p.xz, d.xz);
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, minCornerWorld.z, minCornerWorld.xy, maxCornerWorld.xy, p.z, d.z, p.xy, d.xy);
-      nextHitValue = getNextHitValue(hits.x, nextHitValue, maxCornerWorld.z, minCornerWorld.xy, maxCornerWorld.xy, p.z, d.z, p.xy, d.xy);
-      
-      if (nextHitValue <= curHitValue || nextHitValue >= hits.y) {
-        nextHitValue = curHitValue + min(min(voxelSize.x, voxelSize.y), voxelSize.z) * 0.5;
-      }
-      
+      let nextHitValue = curHitValue + min(min(voxelSize.x, voxelSize.y), voxelSize.z) * stepMultiplier;
       let deltaT = nextHitValue - curHitValue;
       
-      var voxelValue = 0.0;
       var normal = vec3f(0.0, 0.0, 0.0);
       var hasValidNormal = false;
-      var gradient = vec3f(0.0, 0.0, 0.0);
       
-      if (voxelIdx.x >= 0 && voxelIdx.x < i32(volInfo.dims.x) &&
-          voxelIdx.y >= 0 && voxelIdx.y < i32(volInfo.dims.y) &&
-          voxelIdx.z >= 0 && voxelIdx.z < i32(volInfo.dims.z)) {
-        
-        let index = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + 
-                   voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
-        
-        voxelValue = volData[index];
-        
-        // calculate gradient for all voxels (for classification)
-        gradient = calculateGradient(voxelIdx);
-        
-        if (length(gradient) > EPSILON) {
-          normal = -normalize(gradient);
-          hasValidNormal = true;
-        }
+      let gradient = calculateGradientInterpolated(curPoint);
+      
+      if (length(gradient) > EPSILON) {
+        normal = -normalize(gradient);
+        hasValidNormal = true;
       }
       
       if (voxelValue > 20.0) {
@@ -580,43 +578,31 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
         let densityFactor = min(voxelValue / 4095.0 * 3.0, 1.0);
         let stepSize = deltaT * 10.0 * (1.0 + densityFactor * 5.0);
         
-        // exponential attenuation based on density and distance
         var opacity = properties.opacity * (1.0 - exp(-stepSize));
         
         if (tissueType == 1u || tissueType == 2u) {  // bone tissue types
-          opacity = min(opacity * 1.5, 0.98);  // increase opacity but cap at 98%
+          opacity = min(opacity * 1.5, 0.98);
         }
         
-        // only apply lighting if we have a valid normal
         if (hasValidNormal) {
-          // calculate lighting
-          let viewDir = -d;  // direction to camera
+          let viewDir = -d;
           let lightDir = normalize(light.position - curPoint);
-          
-          // diffuse lighting
           let diff = max(dot(normal, lightDir), 0.0) * light.intensity;
-          
-          // ambient term
           let ambient = 0.2;
           
-          // specular
           let reflectDir = reflect(-lightDir, normal);
           let specPower = mix(128.0, 1.0, properties.roughness);
           let specular = pow(max(dot(reflectDir, viewDir), 0.0), specPower) * properties.specular;
           
-          // combine lighting terms
           let lightingFactor = ambient + diff + specular;
           
-          // apply lighting to color
           let litColor = properties.color * lightingFactor * light.color;
           
-          // accumulate color with front-to-back compositing
           accumulatedColor += remainingTransmission * opacity * litColor;
         } else {
           accumulatedColor += remainingTransmission * opacity * properties.color;
         }
 
-        // update remaining transmission
         remainingTransmission *= (1.0 - opacity);
         
         if (remainingTransmission < 0.01) {
@@ -635,6 +621,7 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
   
   textureStore(outTexture, uv, color);
 }
+
 @compute
 @workgroup_size(16, 16)
 fn computeOrthogonalMain(@builtin(global_invocation_id) global_id: vec3u) {
