@@ -275,6 +275,8 @@ struct TissueProperties {
 
 @group(0) @binding(6) var<uniform> light: Light;
 
+@group(0) @binding(7) var<uniform> useTrilinear: u32;
+
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f) -> vec3f {
   // transform the direction using the camera pose
@@ -510,21 +512,47 @@ fn sampleVolumeTrilinear(pos: vec3f) -> f32 {
   return mix(v0, v1, frac.z);
 }
 
-fn calculateGradientInterpolated(pos: vec3f) -> vec3f {
+fn calculateGradient(pos: vec3f) -> vec3f {
   let h = vec3f(1.0) / volInfo.dims.xyz;
   
-  let vx1 = sampleVolumeTrilinear(pos + vec3f(h.x, 0.0, 0.0));
-  let vx0 = sampleVolumeTrilinear(pos - vec3f(h.x, 0.0, 0.0));
-  let vy1 = sampleVolumeTrilinear(pos + vec3f(0.0, h.y, 0.0));
-  let vy0 = sampleVolumeTrilinear(pos - vec3f(0.0, h.y, 0.0));
-  let vz1 = sampleVolumeTrilinear(pos + vec3f(0.0, 0.0, h.z));
-  let vz0 = sampleVolumeTrilinear(pos - vec3f(0.0, 0.0, h.z));
+  let vx1 = sampleVolume(pos + vec3f(h.x, 0.0, 0.0));
+  let vx0 = sampleVolume(pos - vec3f(h.x, 0.0, 0.0));
+  let vy1 = sampleVolume(pos + vec3f(0.0, h.y, 0.0));
+  let vy0 = sampleVolume(pos - vec3f(0.0, h.y, 0.0));
+  let vz1 = sampleVolume(pos + vec3f(0.0, 0.0, h.z));
+  let vz0 = sampleVolume(pos - vec3f(0.0, 0.0, h.z));
   
   return vec3f(
     (vx1 - vx0) / (2.0 * h.x),
     (vy1 - vy0) / (2.0 * h.y),
     (vz1 - vz0) / (2.0 * h.z)
   );
+}
+
+fn sampleVolume(pos: vec3f) -> f32 {
+  if (useTrilinear != 0u) {
+    return sampleVolumeTrilinear(pos);
+  } else {
+    return sampleVolumeNearestNeighbor(pos);
+  }
+}
+
+fn sampleVolumeNearestNeighbor(pos: vec3f) -> f32 {
+  let halfsize = volInfo.dims.xyz * volInfo.sizes.xyz * 0.5 / max(max(volInfo.dims.x, volInfo.dims.y), volInfo.dims.z);
+  let normalizedPos = pos / halfsize;
+  let voxelPos = (normalizedPos + vec3f(1.0, 1.0, 1.0)) * 0.5 * volInfo.dims.xyz;
+  
+  let voxelIdx = vec3i(round(voxelPos));
+  
+  if (voxelIdx.x < 0 || voxelIdx.x >= i32(volInfo.dims.x) ||
+      voxelIdx.y < 0 || voxelIdx.y >= i32(volInfo.dims.y) ||
+      voxelIdx.z < 0 || voxelIdx.z >= i32(volInfo.dims.z)) {
+    return 0.0;
+  }
+  
+  let idx = voxelIdx.x + voxelIdx.y * i32(volInfo.dims.x) + voxelIdx.z * i32(volInfo.dims.x * volInfo.dims.y);
+  
+  return volData[idx];
 }
 
 fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
@@ -556,7 +584,7 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
       
       let curPoint = p + d * curHitValue;
       
-      let voxelValue = sampleVolumeTrilinear(curPoint);
+      let voxelValue = sampleVolume(curPoint);
       
       let nextHitValue = curHitValue + min(min(voxelSize.x, voxelSize.y), voxelSize.z) * stepMultiplier;
       let deltaT = nextHitValue - curHitValue;
@@ -564,7 +592,7 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
       var normal = vec3f(0.0, 0.0, 0.0);
       var hasValidNormal = false;
       
-      let gradient = calculateGradientInterpolated(curPoint);
+      let gradient = calculateGradient(curPoint);
       
       if (length(gradient) > EPSILON) {
         normal = -normalize(gradient);

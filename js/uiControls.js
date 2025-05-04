@@ -134,6 +134,14 @@ export function createUIControls() {
         <span class="value-display" id="light-intensity-value">1.0</span>
       </div>
     </div>
+    <div class="control-section">
+      <h3>Volume Settings</h3>
+      <div class="input-row">
+        <label for="use-trilinear">Interpolation:</label>
+        <input type="checkbox" id="use-trilinear">
+        <span class="value-display" id="use-trilinear-value">0</span>
+      </div>
+    </div>
   `;
   
   document.body.appendChild(controlsDiv);
@@ -285,4 +293,20 @@ export function setupLightControls(volumeObj) {
   }
   
   [lx, ly, lz, lint].forEach(ctrl => ctrl.addEventListener('input', updateLight));
+}
+
+export function setupInterpolationControls(volumeObj) {
+  const useTrilinearCheckbox = document.getElementById('use-trilinear');
+  const useTrilinearValue = document.getElementById('use-trilinear-value');
+  
+  useTrilinearCheckbox.checked = true;
+  useTrilinearValue.textContent = useTrilinearCheckbox.checked ? "on" : "off";
+  
+  volumeObj.setUseTrilinear(useTrilinearCheckbox.checked);
+  
+  useTrilinearCheckbox.addEventListener('change', () => {
+    useTrilinearValue.textContent = useTrilinearCheckbox.checked ? "on" : "off";
+    
+    volumeObj.setUseTrilinear(useTrilinearCheckbox.checked);
+  });
 }
