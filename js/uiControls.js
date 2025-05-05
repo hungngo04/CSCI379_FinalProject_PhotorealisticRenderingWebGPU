@@ -310,3 +310,135 @@ export function setupInterpolationControls(volumeObj) {
     volumeObj.setUseTrilinear(useTrilinearCheckbox.checked);
   });
 }
+
+/**
+ * Sets up tissue color controls
+ * @param {Object} volumeObj - The volume object to update
+ */
+export function setupTissueColorControls(volumeObj) {
+  // Create tissue types section in the UI
+  const controlsDiv = document.querySelector('div[style*="position: absolute"]');
+  
+  // Create new section for tissue colors
+  const tissueSection = document.createElement('div');
+  tissueSection.className = 'control-section';
+  tissueSection.innerHTML = `
+    <h3>Tissue Colors</h3>
+    <div class="tissue-colors">
+      <div class="color-picker-row">
+        <label for="bone-boundary-color">Bone Boundary:</label>
+        <input type="color" id="bone-boundary-color" value="#f5e8db">
+        <div class="color-preview" id="bone-boundary-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="bone-interior-color">Bone Interior:</label>
+        <input type="color" id="bone-interior-color" value="#ebdbc7">
+        <div class="color-preview" id="bone-interior-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="white-matter-boundary-color">White Matter Boundary:</label>
+        <input type="color" id="white-matter-boundary-color" value="#f29e8c">
+        <div class="color-preview" id="white-matter-boundary-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="white-matter-interior-color">White Matter Interior:</label>
+        <input type="color" id="white-matter-interior-color" value="#eb9485">
+        <div class="color-preview" id="white-matter-interior-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="gray-matter-boundary-color">Gray Matter Boundary:</label>
+        <input type="color" id="gray-matter-boundary-color" value="#e38c80">
+        <div class="color-preview" id="gray-matter-boundary-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="gray-matter-interior-color">Gray Matter Interior:</label>
+        <input type="color" id="gray-matter-interior-color" value="#d87a73">
+        <div class="color-preview" id="gray-matter-interior-preview"></div>
+      </div>
+      <div class="color-picker-row">
+        <label for="csf-color">CSF & Other Tissues:</label>
+        <input type="color" id="csf-color" value="#e6a699">
+        <div class="color-preview" id="csf-preview"></div>
+      </div>
+    </div>
+  `;
+  
+  // Add additional CSS
+  const styleElement = document.createElement('style');
+  styleElement.textContent = `
+    .color-picker-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .color-picker-row label {
+      width: 120px;
+      font-size: 12px;
+    }
+    .color-picker-row input[type="color"] {
+      width: 25px;
+      height: 25px;
+      border: none;
+      padding: 0;
+      background: none;
+      cursor: pointer;
+    }
+    .color-preview {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      margin-left: 5px;
+      border: 1px solid #999;
+    }
+  `;
+  document.head.appendChild(styleElement);
+  
+  // Add the section to the controls
+  controlsDiv.appendChild(tissueSection);
+  
+  // Helper function to convert hex to RGB array [0-1 range]
+  function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? [
+      parseInt(result[1], 16) / 255,
+      parseInt(result[2], 16) / 255,
+      parseInt(result[3], 16) / 255
+    ] : [1, 1, 1];
+  }
+  
+  // Helper function to update preview elements
+  function updatePreview(id, color) {
+    const preview = document.getElementById(id);
+    preview.style.backgroundColor = color;
+  }
+  
+  // Initialize preview elements
+  const colorInputs = {
+    'bone-boundary-color': { id: 'bone-boundary-preview', type: 'boneBoundary' },
+    'bone-interior-color': { id: 'bone-interior-preview', type: 'boneInterior' },
+    'white-matter-boundary-color': { id: 'white-matter-boundary-preview', type: 'whiteMatterBoundary' },
+    'white-matter-interior-color': { id: 'white-matter-interior-preview', type: 'whiteMatterInterior' },
+    'gray-matter-boundary-color': { id: 'gray-matter-boundary-preview', type: 'grayMatterBoundary' },
+    'gray-matter-interior-color': { id: 'gray-matter-interior-preview', type: 'grayMatterInterior' },
+    'csf-color': { id: 'csf-preview', type: 'csf' }
+  };
+  
+  // Set up event listeners for all color inputs
+  Object.entries(colorInputs).forEach(([inputId, data]) => {
+    const input = document.getElementById(inputId);
+    
+    // Initial preview
+    updatePreview(data.id, input.value);
+    
+    // Update color on change
+    input.addEventListener('input', () => {
+      updatePreview(data.id, input.value);
+    });
+    
+    // Apply color when finished selecting
+    input.addEventListener('change', () => {
+      const rgbColor = hexToRgb(input.value);
+      volumeObj.updateTissueColor(data.type, rgbColor);
+    });
+  });
+}

@@ -260,6 +260,16 @@ struct TissueProperties {
   roughness: f32,
 }
 
+struct TissueColors {
+  bone_boundary: vec3f,
+  bone_interior: vec3f,
+  white_matter_boundary: vec3f,
+  white_matter_interior: vec3f,
+  gray_matter_boundary: vec3f,
+  gray_matter_interior: vec3f,
+  csf: vec3f,
+}
+
 // binding the camera pose
 @group(0) @binding(0) var<uniform> cameraPose: Camera ;
 // binding the volume info
@@ -276,6 +286,8 @@ struct TissueProperties {
 @group(0) @binding(6) var<uniform> light: Light;
 
 @group(0) @binding(7) var<uniform> useTrilinear: u32;
+
+@group(0) @binding(8) var<uniform> tissueColors: TissueColors;
 
 // a function to transform the direction to the model coordiantes
 fn transformDir(d: vec3f) -> vec3f {
@@ -408,49 +420,49 @@ fn getTissueProperties(tissueType: u32) -> TissueProperties {
 
   switch(tissueType) {
     case 1u: { // bone boundary
-      properties.color = vec3f(0.96, 0.91, 0.86);
+      properties.color = tissueColors.bone_boundary;
       properties.opacity = 0.95;
       properties.specular = 0.3;
       properties.roughness = 0.7;
       break;
     }
     case 2u: { // bone interior
-      properties.color = vec3f(0.92, 0.86, 0.78);
+      properties.color = tissueColors.bone_interior;
       properties.opacity = 0.9;
       properties.specular = 0.1;
       properties.roughness = 0.9;
       break;
     }
     case 3u: { // white matter boundary
-      properties.color = vec3f(0.95, 0.62, 0.55);
+      properties.color = tissueColors.white_matter_boundary;
       properties.opacity = 0.7;
       properties.specular = 0.2;
       properties.roughness = 0.6;
       break;
     }
     case 4u: { // white matter interior
-      properties.color = vec3f(0.92, 0.58, 0.52);
+      properties.color = tissueColors.white_matter_interior;
       properties.opacity = 0.6;
       properties.specular = 0.05;
       properties.roughness = 0.8;
       break;
     }
     case 5u: { // gray matter boundary
-      properties.color = vec3f(0.89, 0.55, 0.50);
+      properties.color = tissueColors.gray_matter_boundary;
       properties.opacity = 0.6;
       properties.specular = 0.1;
       properties.roughness = 0.7;
       break;
     }
     case 6u: { // gray matter interior
-      properties.color = vec3f(0.85, 0.48, 0.45);
+      properties.color = tissueColors.gray_matter_interior;
       properties.opacity = 0.4;
       properties.specular = 0.05;
       properties.roughness = 0.9;
       break;
     }
     case 7u: { // csf and other tissues
-      properties.color = vec3f(0.90, 0.65, 0.60);
+      properties.color = tissueColors.csf;
       properties.opacity = 0.2;
       properties.specular = 0.0;
       properties.roughness = 1.0;
