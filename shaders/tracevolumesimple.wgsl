@@ -645,7 +645,7 @@ fn traceSceneDRR(uv: vec2i, p: vec3f, d: vec3f) {
 
         remainingTransmission *= (1.0 - opacity);
         
-        if (remainingTransmission < 0.01) {
+        if (remainingTransmission < 0.5) {
           break;
         }
       }
