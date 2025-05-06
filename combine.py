@@ -26,16 +26,37 @@ import re
 import os
 import rjsmin
 
-def combineContent(file, curDir, imported):
+def combineContent(file, curDir, imported, root_dir=None):
   if file in imported: return r'' # already imported
   imported.add(file)
-  with open(curDir + '/' + file, 'r') as file:
-    content = file.read()
+  
+  # Store project root directory the first time
+  if root_dir is None:
+    root_dir = os.path.abspath(os.path.dirname(os.path.dirname(curDir)))
+  
+  # Handle path resolution based on whether it begins with / or not
+  if file.startswith('/'):
+    # Absolute path from project root
+    filepath = os.path.normpath(os.path.join(root_dir, file.lstrip('/')))
+  else:
+    # Relative path from current directory
+    filepath = os.path.normpath(os.path.join(curDir, file))
+  
+  # Check if file exists, if not try to resolve with project root
+  if not os.path.exists(filepath):
+    # Try to find it relative to project root
+    filepath = os.path.normpath(os.path.join(root_dir, file))
+  
+  with open(filepath, 'r') as f:
+    content = f.read()
+  
   # import files
   pattern = r'(import +.*? +from +[\'"](.*?)[\'"]\s*)'
   matches = re.findall(pattern, content)
   for oldText, importFile in matches:
-    fileContent = combineContent(importFile, curDir, imported)
+    # Use dirname of current file for relative imports
+    import_dir = os.path.dirname(filepath)
+    fileContent = combineContent(importFile, import_dir, imported, root_dir)
     content = content.replace(oldText, fileContent + '\n\n')
   return content
 
@@ -44,7 +65,8 @@ def main():
     print("Usage: python combine.py <the entry js file>")
   else:
     imported = set()
-    content = combineContent(sys.argv[1], os.path.dirname(sys.argv[1]), imported)
+    project_root = os.path.abspath(os.path.dirname(os.path.abspath(sys.argv[0])))
+    content = combineContent(sys.argv[1], os.path.dirname(os.path.abspath(sys.argv[1])), imported, project_root)
     # get rid of export default 
     content = content.replace("export default ", '')
     # replace "*/*.wgsl" with "*/optimized_*.wgsl"
